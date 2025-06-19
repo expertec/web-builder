@@ -357,4 +357,21 @@ margin-top: 40px;
   /* opcional: un poco de sombra para destacarlo aún más */
   text-shadow: 0 0 6px rgba(0, 230, 118, 0.7);
 }
+/* Oculta los mensajes de error de AntD Form */
+.ant-form-item-explain-error {
+  display: none !important;
+}
 
+/* Asegura que los toast SIEMPRE estén arriba de cualquier overlay/fixed */
+.ant-message {
+  z-index: 99999 !important;
+  position: fixed !important;
+  top: 16px !important; /* posición estándar */
+  left: 0;
+  width: 100vw;
+  pointer-events: none;
+}
+
+.ant-message-notice-content {
+  pointer-events: all;
+}

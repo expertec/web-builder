@@ -14,6 +14,8 @@ import {
   Layout
 
 } from 'antd'
+import { toast } from 'sonner';
+
 import PalettePicker from '../components/PalettePicker'
 import { db } from '../config/firebase'
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
@@ -371,18 +373,35 @@ const palettes = [
 <Form.Item
   label="Elige una paleta de color *"
   name="palette"
-  rules={[{ required: true, message: 'Selecciona una paleta de color.' }]}
+  rules={[
+    { required: true, message: 'Selecciona una paleta de color.' },
+    {
+      validator: (_, value) => {
+        if (
+          value === null ||
+          value === undefined ||
+          value === '' ||
+          value === -1
+        ) {
+          return Promise.reject('Selecciona una paleta de color.')
+        }
+        return Promise.resolve()
+      },
+    },
+  ]}
 >
-<PalettePicker
-  palettes={palettes}
-  value={form.getFieldValue('palette')}
-  onChange={idx => {
-    form.setFieldsValue({ palette: idx })
-    form.validateFields(['palette'])
-  }}
-/>
-
+  <PalettePicker
+    palettes={palettes}
+    value={form.getFieldValue('palette')}
+    onChange={idx => {
+      form.setFieldsValue({ palette: idx })
+      form.validateFields(['palette'])
+    }}
+  />
 </Form.Item>
+
+
+
 
       </>
     )
@@ -622,19 +641,17 @@ const palettes = [
 
   ]
 
-const next = async () => {
+  const next = async () => {
   try {
     const map = [
       ['businessSector'],
-      ['businessStory'],
-      ['companyInfo'],
+      ['companyInfo', 'businessStory'],
       ['palette'],
       ['differential'],
       ['keyItems'],
-      ['contactWhatsapp'],
+      ['contactWhatsapp', 'contactEmail', 'socialFacebook', 'socialInstagram'],
       []
     ];
-
     await form.validateFields(map[current] || []);
     if (current < steps.length - 1) {
       setCurrent(c => c + 1);
@@ -642,9 +659,15 @@ const next = async () => {
       form.submit();
     }
   } catch (err) {
-    // Aquí puedes mostrar el error (AntD ya lo muestra en el campo)
+    if (err && err.errorFields && err.errorFields.length) {
+      toast.error(err.errorFields[0].errors[0]);
+    }
   }
-}
+};
+
+
+
+
 
 
 
@@ -728,9 +751,20 @@ const slug = await getUniqueSlug(rawName, db);
     setLoading(false)
   }
 }
+useEffect(() => {
+  // solo cuando estés en el paso de la paleta
+  if (current === 2) {
+    console.log("Valor de palette:", form.getFieldValue('palette'))
+  }
+}, [current, form])
 
+useEffect(() => {
+  message.destroy('form-wizard-error');
+}, [current]);
 
-
+useEffect(() => {
+  message.info('Toast de prueba visible', 3);
+}, []);
 
 
   return (

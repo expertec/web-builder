@@ -8,12 +8,14 @@ import Desktop from './Pages/Desktop';
 import ProtectedRoute from './components/ProtectedRoute';
 import BriefWizard from './Pages/BriefWizard';
 import SitePage from './Pages/SitePage';  // ← importa el renderer de sitios
+import { Toaster } from 'sonner';
 
 const { Content } = Layout;
 
 function App() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
+         <Toaster richColors position="top-center" />
       <Content style={{ padding: 0 }}>
         <Routes>
           {/* Pantalla del wizard */}
