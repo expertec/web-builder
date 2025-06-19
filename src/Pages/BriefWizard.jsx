@@ -1,5 +1,5 @@
 // src/Pages/BriefWizard.jsx
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Form,
@@ -22,7 +22,17 @@ import slugify from 'slugify'
 import logo from '../../src/assets/logo-white.png'
 import logosBrands from '../../src/assets/logos-brands.png';
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
+import {
+
+
+  query,
+  where,
+  getDocs,
+
+} from 'firebase/firestore'
+
 import { useLocation } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { ArrowLeftOutlined, InboxOutlined,UploadOutlined,  ArrowRightOutlined } from '@ant-design/icons'
 import styles from './StepForm.module.css'
@@ -36,12 +46,89 @@ export default function BriefWizard() {
   const { Dragger } = Upload
   const { Option } = Select
   const [loading, setLoading] = useState(false);
-const { Header, Content } = Layout
+  const { Header, Content } = Layout
   const location = useLocation()
-  // busco un param “phone” en la query: ?phone=5218311760335
-  const params = new URLSearchParams(location.search)
-  const urlPhone = params.get('phone') || ''
+// Genera un slug único (agrega -002, -003... si ya existe)
+async function getUniqueSlug(rawName, db) {
+  const baseSlug = slugify(rawName, { lower: true, strict: true });
+  const refNeg = collection(db, 'Negocios');
+  let slug = baseSlug;
+  let counter = 2;
+
+  // Busca todos los slugs iguales o con sufijo numérico
+  let exists = true;
+  while (exists) {
+    const q = query(refNeg, where('slug', '==', slug));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      exists = false;
+    } else {
+      slug = `${baseSlug}-${String(counter).padStart(3, '0')}`;
+      counter++;
+    }
+  }
+  return slug;
+}
+
+
+
+ 
   const navigate = useNavigate()
+  const { phone: urlPhone = '' } = useParams()
+  const cleanedUrlPhone = urlPhone
+  .replace(/\s+/g, '')      // quita espacios
+  .replace(/^\+/, '')       // quita “+”
+  .replace(/^521/, '')      // quita el “521” al inicio
+
+
+// null = aún no he comprobado, '' = comprobado y NO existe, 'mensaje' = comprobado y SÍ existe
+const [urlPhoneError, setUrlPhoneError] = useState(null)
+const [phoneChecked,  setPhoneChecked]  = useState(false)
+
+
+
+ useEffect(() => {
+  console.log('Param phone:', urlPhone)
+  console.log('Cleaned:', cleanedUrlPhone)
+  if (!cleanedUrlPhone) {
+    setUrlPhoneError(null)
+    setPhoneChecked(true)
+    return
+  }
+
+  // 🔥 Este bloque SÍ es necesario
+  (async () => {
+    try {
+      const variants = [cleanedUrlPhone, '521' + cleanedUrlPhone]
+      const refNeg = collection(db, 'Negocios')
+      let exists = false
+
+      for (let num of variants) {
+        const snap = await getDocs(query(refNeg, where('leadPhone', '==', num)))
+        if (!snap.empty) {
+          exists = true
+          break
+        }
+      }
+
+      setUrlPhoneError(
+        exists ? 'Ya existe un negocio con ese WhatsApp.' : ''
+      )
+      setPhoneChecked(true)
+    } catch (e) {
+      // Puedes mostrar un error amigable si falla Firestore
+      setUrlPhoneError('Error validando teléfono')
+      setPhoneChecked(true)
+    }
+  })()
+}, [cleanedUrlPhone])
+
+
+
+
+
+
+
   // Definimos unas paletas de ejemplo
 const palettes = [
   // Startups tecnológicas
@@ -91,7 +178,61 @@ const palettes = [
   ['#00838F', '#4DD0E1', '#E1F5FE', '#FFFFFF'],
   ['#B3E5FC', '#81D4FA', '#29B6F6', '#01579B'],
   ['#FFF3E0', '#FFE0B2', '#FFCCBC', '#BF360C'],
+
+    ['#B71C1C', '#D32F2F', '#F44336', '#FFFFFF'],
+  // Rojo con gris elegante (muy usado en fintech y tech)
+  ['#C62828', '#BDBDBD', '#424242', '#F5F5F5'],
+  // Rojo con azul corporativo
+  ['#E53935', '#1E88E5', '#1565C0', '#F5F7FA'],
+  // Rojo sobrio + dorado
+  ['#A93226', '#E6B800', '#FBFCFC', '#212F3D'],
+  // Rojo, negro y gris oscuro (consultorías y tech B2B)
+  ['#B71C1C', '#212121', '#424242', '#ECECEC'],
+  // Rojo vivo, azul marino y gris
+  ['#FF1B1B', '#1A2238', '#9DAAF2', '#F4F4F4'],
+  // Rojo oscuro y blanco puro (minimalista, para branding fuerte)
+  ['#D72638', '#FFFFFF', '#2E2E2E', '#F7F7F7'],
+
+  // Amarillo / Dorado y tierra
+  ['#FFD23F', '#EEA243', '#1B1B1E', '#F5F1ED'],
+  ['#FFC857', '#6A0572', '#AB83A1', '#F5F1ED'],
+  ['#F9A620', '#F7F7FF', '#262626', '#A5BE00'],
+
+  // Verdes y frescos
+  ['#0B6E4F', '#3BB273', '#9BC53D', '#E0FF4F'],
+  ['#86C232', '#61892F', '#222629', '#474B4F'],
+  ['#1FAB89', '#62D2A2', '#9DF3C4', '#D7FBE8'],
+
+  // Minimalistas/Grises
+  ['#232931', '#393E46', '#EEEEEE', '#F6F6F6'],
+  ['#22223B', '#4A4E69', '#9A8C98', '#F2E9E4'],
+  ['#2E2E2E', '#FFD166', '#06D6A0', '#F6F6F6'],
+
+  // Pasteles y creativas
+  ['#FFB6B9', '#FAE3D9', '#BBDED6', '#8AC6D1'],
+  ['#F9C6C9', '#FFB677', '#FFF2AF', '#D4EAC8'],
+  ['#B2F9FC', '#FFD6E0', '#F6DFEB', '#C7CEEA'],
+
+  // Elegantes
+  ['#333533', '#6E8894', '#EAF6FF', '#FFFFFF'],
+  ['#292F36', '#4ECDC4', '#FFE66D', '#FF6B6B'],
+   // Azul corporativo clásico
+  ['#003366', '#00509E', '#74A9CF', '#FFFFFF'],
+  // Azul navy, gris claro, blanco (muy usado en SaaS)
+  ['#223A5E', '#1E555C', '#E6E6EA', '#FFFFFF'],
+  // Azul rey con acento aqua y blanco (startups y fintech)
+  ['#1976D2', '#2196F3', '#00B8D9', '#F4F7FA'],
+  // Azul, cian y acento verde (consultoría tecnológica)
+  ['#264653', '#2A9D8F', '#E9C46A', '#F4F7FA'],
+  // Azul oscuro y gris metálico (para despachos)
+  ['#232F34', '#344955', '#4A6572', '#F9AA33'],
+  // Azul petróleo, gris claro y blanco
+  ['#2C3E50', '#6C7A89', '#BDC3C7', '#ECF0F1'],
+  // Azul intenso, blanco y acento naranja (dinámico y moderno)
+  ['#2541B2', '#1768AC', '#06BEE1', '#FFFFFF'],
+
 ];
+
 
 
   
@@ -227,28 +368,22 @@ const palettes = [
             </p>
           </Upload.Dragger>
         </Form.Item>
+<Form.Item
+  label="Elige una paleta de color *"
+  name="palette"
+  rules={[{ required: true, message: 'Selecciona una paleta de color.' }]}
+>
+<PalettePicker
+  palettes={palettes}
+  value={form.getFieldValue('palette')}
+  onChange={idx => {
+    form.setFieldsValue({ palette: idx })
+    form.validateFields(['palette'])
+  }}
+/>
 
-        {/* Selector de paletas (igual que antes) */}
-        <Form.Item
-          label="Elige una paleta de color *"
-          required
-          validateStatus={selectedPalette == null ? 'error' : undefined}
-          help={selectedPalette == null ? 'Selecciona una paleta para continuar' : null}
-        >
-          <PalettePicker
-            palettes={palettes}
-            value={selectedPalette}
-            onChange={idx => {
-              setSelectedPalette(idx)
-              form.setFieldsValue({ palette: palettes[idx] })
-            }}
-          />
-        </Form.Item>
+</Form.Item>
 
-        {/* Campo oculto para la paleta */}
-        <Form.Item name="palette" hidden rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
       </>
     )
   }
@@ -412,49 +547,106 @@ const palettes = [
     </>
   )
 },
-    {
-  title: 'Revisión final',
+ {
+  title: '',
   fields: (
-    <div style={{ lineHeight: 1.6 }}>
-      <p><strong>Empresa y Fundación:</strong> {form.getFieldValue('companyInfo')}</p>
-      <p><strong>Giro:</strong> {(form.getFieldValue('businessSector') || []).join(', ')}</p>
-      <p><strong>Descripción breve:</strong> {form.getFieldValue('businessStory')}</p>
-      <p><strong>Paleta seleccionada:</strong> {form.getFieldValue('palette')?.join(', ')}</p>
-      <p><strong>Propuesta diferencial:</strong> {form.getFieldValue('differential')}</p>
-      { (form.getFieldValue('keyItems') || []).map((item, i) => (
-        <div key={i} style={{ marginBottom: 8 }}>
-          <strong>Producto {i+1}:</strong> {item.title}<br/>
-          <em>Descripción:</em> {item.description}
-        </div>
-      )) }
-      <p><strong>WhatsApp de contacto:</strong> {form.getFieldValue('contactWhatsapp')}</p>
-      <p><strong>Fecha de revisión:</strong> {dayjs().format('YYYY-MM-DD')}</p>
-    </div>
+    <>
+      { urlPhone ? (
+        // —— caso URL —— 
+        !phoneChecked ? (
+          // mientras validamos…
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <Spin tip="Validando número…" />
+          </div>
+        ) : urlPhoneError ? (
+          // válido, pero existe en Firestore
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <h2 style={{ color: '#E53935', fontSize: '2rem' }}>💔 Lo sentimos</h2>
+            <p>Ya hay un negocio registrado con el número de WhatsApp:</p>
+            <p style={{ fontWeight: 600, fontSize: '1.5rem' }}>
+              +521{cleanedUrlPhone}
+            </p>
+          </div>
+        ) : (
+          // válido y *no* existe
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <h2 style={{ color: '#00E676', fontSize: '2rem' }}>✅ ¡Listo!</h2>
+            <p>Te enviaremos el enlace de tu web al WhatsApp:</p>
+            <p style={{ fontWeight: 600, fontSize: '1.5rem' }}>
+              +521{cleanedUrlPhone}
+            </p>
+          </div>
+        )
+      ) : (
+        // —— caso SIN URL (input manual) ——
+        <Form.Item
+  name="leadPhone"
+  label="¿A qué número de WhatsApp enviamos el enlace?"
+  rules={[
+    { required: true, message: 'Necesitamos tu número de WhatsApp.' },
+    {
+      async validator(_, rawValue) {
+        const val = rawValue
+          .trim()
+          .replace(/^\+/, '')
+          .replace(/^521/, '')
+        if (!/^\d{7,}$/.test(val)) {
+          return Promise.reject(new Error('El número parece inválido.'))
+        }
+        // validación en Firestore con y sin 521
+        const variants = [val, '521' + val]
+        const refNeg   = collection(db, 'Negocios')
+        for (let n of variants) {
+          const snap = await getDocs(
+            query(refNeg, where('leadPhone', '==', n))
+          )
+          if (!snap.empty) {
+            return Promise.reject(
+              new Error('Ya existe un negocio con ese WhatsApp.')
+            )
+          }
+        }
+        return Promise.resolve()
+      }
+    }
+  ]}
+>
+  <Input placeholder="+521XXXXXXXXXX" size="large" />
+</Form.Item>
+
+      )}
+    </>
   )
 }
+
+
   ]
 
-  const next = async () => {
-    try {
-      // validar sólo los campos de este paso
-      const map = [
-  ['businessSector'],        // paso 1: validar sólo el select
-  ['businessStory'],         // paso 2: validar sólo la descripción
-  ['companyInfo'],           // paso 3: validar sólo companyInfo
-  ['logoFiles','palette'],   // paso 4 original
-  ['differential'],          // paso 5 original
-  ['keyItems'],              // paso 6 original
-  ['contactWhatsapp'],       // paso 7 original
-  []                         // paso final no valida
-]
-      await form.validateFields(map[current] || [])
-     if (current < steps.length - 1) {
-       setCurrent(c => c + 1)
-     } else {
-       form.submit()
-     }
-    } catch {}
+const next = async () => {
+  try {
+    const map = [
+      ['businessSector'],
+      ['businessStory'],
+      ['companyInfo'],
+      ['palette'],
+      ['differential'],
+      ['keyItems'],
+      ['contactWhatsapp'],
+      []
+    ];
+
+    await form.validateFields(map[current] || []);
+    if (current < steps.length - 1) {
+      setCurrent(c => c + 1);
+    } else {
+      form.submit();
+    }
+  } catch (err) {
+    // Aquí puedes mostrar el error (AntD ya lo muestra en el campo)
   }
+}
+
+
 
   const prev = () => setCurrent(c => c - 1)
 
@@ -496,12 +688,14 @@ const onFinish = async (values) => {
       })
     )
 
-    // 3️⃣ Genera el slug a partir del nombre de la empresa
-    //    Ex: "TechCorp S.A. de C.V., fundada en 2015" → "techcorp-s-a-de-c-v"
-    const rawName = values.companyInfo.split(',')[0]
-    const slug = slugify(rawName, { lower: true, strict: true })
+  // 3️⃣ Genera el slug ÚNICO a partir del nombre de la empresa
+const rawName = values.companyInfo.split(',')[0]
+const slug = await getUniqueSlug(rawName, db);
 
-    // 4️⃣ Construye el objeto a guardar
+    // 4️⃣ OBTÉN EL LEAD PHONE CORRECTO
+    const leadPhoneValue = cleanedUrlPhone || (values.leadPhone || '').trim()
+
+    // 5️⃣ Construye el objeto a guardar
     const negocio = {
       companyInfo:     values.companyInfo,
       businessSector:  values.businessSector,
@@ -514,17 +708,18 @@ const onFinish = async (values) => {
       socialFacebook:  values.socialFacebook || '',
       socialInstagram: values.socialInstagram || '',
       logoURL,
-      slug,                            // ← aquí va el slug
+      slug,
       createdAt:       Timestamp.now(),
-      status:          'Sin procesar'
+      
+      status:          'Sin procesar',
+      leadPhone:       leadPhoneValue, // <--- aquí ya existe la variable!
     }
 
-    // 5️⃣ Guarda en Firestore
+    // 6️⃣ Guarda en Firestore
     const docRef = await addDoc(collection(db, 'Negocios'), negocio)
 
-    // 6️⃣ Mensaje de éxito y redirección
+    // 7️⃣ Mensaje de éxito y redirección
     message.success(`¡Brief guardado! Tu página estará disponible en /${slug}`)
-    // Redirige a tu home u otra página:
     window.location.href = 'https://landing.negociosweb.mx/gracias/'
   } catch (err) {
     console.error('Error guardando en Firestore o Storage:', err)
@@ -533,6 +728,7 @@ const onFinish = async (values) => {
     setLoading(false)
   }
 }
+
 
 
 
@@ -653,15 +849,11 @@ const onFinish = async (values) => {
 </Form>
 
 
-
-        <div className={styles.footerBar}>
-
+<div className={styles.footerBar}>
   {current < steps.length - 1 ? (
-
-
-      <Button
-      type="ghost"                      // ← ghost en lugar de text/primary
-      className={styles.continueButton} // misma clase que la navbarButton
+    <Button
+      type="ghost"
+      className={styles.continueButton}
       onClick={next}
       icon={<ArrowRightOutlined />}
     >
@@ -669,16 +861,21 @@ const onFinish = async (values) => {
     </Button>
   ) : (
     <Button
-      type="ghost"                      // ← ghost en lugar de text/primary
-      className={styles.continueButton} // misma clase que la navbarButton
-      onClick={next}
+      type="ghost"
+      className={styles.continueButton}
+      onClick={next} // <-- Aquí
+      disabled={
+        urlPhone 
+          ? (!!urlPhoneError || !phoneChecked)
+          : false
+      }
       icon={<ArrowRightOutlined />}
     >
-      Hacer mi web
+      Confirmar
     </Button>
   )}
-  
 </div>
+
 
 
 

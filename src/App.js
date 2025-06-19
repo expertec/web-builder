@@ -19,7 +19,7 @@ function App() {
           {/* Pantalla del wizard */}
         
             {/* Pantalla del wizard, con parámetro opcional `phone` */}
-            <Route path="/:phone?" element={<BriefWizard />} />
+       
 
           {/* Previsualización de sitio generado */}
           <Route path="/site/:slug" element={<SitePage />} />
@@ -36,6 +36,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+               <Route path="/:phone?" element={<BriefWizard />} />
+                 <Route path="/" element={<BriefWizard />} />
 
           {/* Cualquier otra ruta redirige a / */}
           <Route path="*" element={<Navigate to="/" replace />} />

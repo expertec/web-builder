@@ -1,7 +1,7 @@
 // src/pages/SitePage.jsx
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Spin, message } from 'antd'
+import { Spin, Alert } from 'antd'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import SiteTemplate from '../components/SiteTemplate'
@@ -10,10 +10,13 @@ export default function SitePage() {
   const { slug } = useParams()
   const [docData, setDocData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
+      setError(null)
+      setDocData(null)
       try {
         const q = query(
           collection(db, 'Negocios'),
@@ -22,22 +25,18 @@ export default function SitePage() {
         )
         const snap = await getDocs(q)
         if (snap.empty) {
-          message.error(`No encontré ningún negocio con slug “${slug}”`)
-          setDocData(null)
+          setError(`No encontramos una página para “${slug}”.`)
           return
         }
         const data = snap.docs[0].data()
         if (!data.schema) {
-          message.error('Este negocio aún no tiene schema generado.')
-          setDocData(null)
+          setError('La página está en proceso de creación. Vuelve más tarde.')
           return
         }
-        // guardamos TODO el documento, no solo data.schema
         setDocData(data)
       } catch (err) {
+        setError('Error cargando los datos del negocio.')
         console.error(err)
-        message.error('Error cargando los datos del negocio.')
-        setDocData(null)
       } finally {
         setLoading(false)
       }
@@ -46,14 +45,20 @@ export default function SitePage() {
   }, [slug])
 
   if (loading) {
-    return <Spin style={{ margin: '4rem auto', display: 'block' }} />
+    return <Spin style={{ margin: '4rem auto', display: 'block' }} tip="Cargando página..." />
   }
 
-  if (!docData) {
-    // ya mostramos mensaje de error arriba
-    return null
+  if (error) {
+    return (
+      <div style={{ maxWidth: 420, margin: '4rem auto' }}>
+        <Alert
+          message={error}
+          type="warning"
+          showIcon
+        />
+      </div>
+    )
   }
 
-  // le pasamos TODO el documento para que SiteTemplate pueda leer logoURL, schema, etc.
   return <SiteTemplate schema={docData} />
 }
